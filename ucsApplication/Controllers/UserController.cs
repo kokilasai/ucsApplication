@@ -17,7 +17,7 @@ namespace ucsApplication.Controllers
             _context = context;
         }
 
-        [HttpPost("checkin")]
+        /*[HttpPost("checkin")]
         public async Task<IActionResult> CheckIn([FromBody] AttendanceRequest request)
         {
             try
@@ -112,6 +112,224 @@ namespace ucsApplication.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+        */
+
+        [HttpPost("checkin")]
+        public async Task<IActionResult> CheckIn([FromBody] List<AttendanceRequest> requests)
+        {
+            try
+            {
+                if (requests == null || requests.Count == 0)
+                {
+                    return BadRequest("Request list cannot be empty.");
+                }
+
+                var responses = new List<object>();
+
+                foreach (var request in requests)
+                {
+                    // Validate input: UserId or FingerPrintData must be provided
+                    if (string.IsNullOrEmpty(request.FingerPrintData) && !request.UserId.HasValue)
+                    {
+                        responses.Add(new
+                        {
+                            message = "Validation failed: Either UserId or FingerPrintData must be provided.",
+                            status = "Error"
+                        });
+                        continue;
+                    }
+
+                    // Find the user in MasterTable
+                    MasterTable user = null;
+                    if (string.IsNullOrEmpty(request.FingerPrintData))
+                    {
+                        user = await _context.MasterTable
+                            .FirstOrDefaultAsync(u => u.FingerPrintData == request.FingerPrintData);
+                    }
+                    else if (request.UserId.HasValue)
+                    {
+                        user = await _context.MasterTable
+                            .FirstOrDefaultAsync(u => u.UserId == request.UserId.Value);
+                    }
+
+                    if (user == null)
+                    {
+                        responses.Add(new
+                        {
+                            message = "UserId or FingerPrintData not found in MasterTable.",
+                            userId = request.UserId,
+                            status = "Error"
+                        });
+                        continue;
+                    }
+
+                    // Check if the user is already checked in
+                    var existingTransaction = await _context.TransactionTable
+                        .FirstOrDefaultAsync(t => t.UserId == user.MasterId && t.CheckoutDateTime == null);
+
+                    if (existingTransaction != null)
+                    {
+                        responses.Add(new
+                        {
+                            message = "User is already checked in.",
+                            userId = user.UserId,
+                            username = user.Username,
+                            status = "Error"
+                        });
+                        continue;
+                    }
+
+                    // Create a new transaction
+                    var transaction = new TransactionTable
+                    {
+                        UserId = user.MasterId,
+                        CheckinDateTime = DateTime.UtcNow,
+                        CheckoutDateTime = null,
+                        CheckInMethod = string.IsNullOrEmpty(request.FingerPrintData) ? "FingerPrint" : "UserId"
+                    };
+
+                    // Update user's LastTransactionDate
+                    user.LastTransactionDate = DateTime.UtcNow;
+
+                    // Add transaction to the context
+                    _context.TransactionTable.Add(transaction);
+
+                    // Prepare successful response
+                    responses.Add(new
+                    {
+                        message = "Check-in successful",
+                        userId = user.UserId,
+                        username = user.Username,
+                        checkInTime = transaction.CheckinDateTime,
+                        checkInMethod = transaction.CheckInMethod,
+                        status = "Success"
+                    });
+                }
+
+                // Save all changes in one batch
+                await _context.SaveChangesAsync();
+
+                return Ok(responses);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+
+        //[HttpPost("checkout")]
+        //public async Task<IActionResult> CheckOut([FromBody] List<AttendanceRequest> requests)
+        //{
+        //    try
+        //    {
+        //        if (requests == null || requests.Count == 0)
+        //        {
+        //            return BadRequest("The request body must contain at least one attendance entry.");
+        //        }
+
+        //        var results = new List<object>();
+
+        //        foreach (var request in requests)
+        //        {
+        //            try
+        //            {
+        //                // Validate input: UserId or FingerPrintData must be provided
+        //                if (string.IsNullOrEmpty(request.FingerPrintData) && !request.UserId.HasValue)
+        //                {
+        //                    results.Add(new
+        //                    {
+        //                        request.UserId,
+        //                        message = "Either UserId or FingerPrintData must be provided.",
+        //                        status = "Error"
+        //                    });
+        //                    continue;
+        //                }
+
+        //                // Step 1: Find the user in MasterTable
+        //                MasterTable user = null;
+
+        //                if (!string.IsNullOrEmpty(request.FingerPrintData))
+        //                {
+        //                    user = await _context.MasterTable
+        //                        .FirstOrDefaultAsync(u => u.FingerPrintData == request.FingerPrintData);
+        //                }
+        //                else if (request.UserId.HasValue)
+        //                {
+        //                    user = await _context.MasterTable
+        //                        .FirstOrDefaultAsync(u => u.UserId == request.UserId.Value);
+        //                }
+
+        //                if (user == null)
+        //                {
+        //                    results.Add(new
+        //                    {
+        //                        request.UserId,
+        //                        request.FingerPrintData,
+        //                        message = "UserId or FingerPrintData not found in MasterTable.",
+        //                        status = "Error"
+        //                    });
+        //                    continue;
+        //                }
+
+        //                // Step 2: Find the active check-in transaction
+        //                var transaction = await _context.TransactionTable
+        //                    .FirstOrDefaultAsync(t => t.UserId == user.MasterId && t.CheckoutDateTime == null);
+
+        //                if (transaction == null)
+        //                {
+        //                    results.Add(new
+        //                    {
+        //                        user.UserId,
+        //                        message = "No active check-in found for the user.",
+        //                        status = "Error"
+        //                    });
+        //                    continue;
+        //                }
+
+        //                // Step 3: Update checkout time and calculate duration
+        //                transaction.CheckoutDateTime = DateTime.UtcNow;
+
+        //                // Update user's LastTransactionDate
+        //                user.LastTransactionDate = DateTime.UtcNow;
+
+        //                // Calculate total duration
+        //                var totalDuration = transaction.CheckoutDateTime - transaction.CheckinDateTime;
+
+        //                // Save changes
+        //                await _context.SaveChangesAsync();
+
+        //                // Step 4: Add success result
+        //                results.Add(new
+        //                {
+        //                    userId = user.UserId,
+        //                    username = user.Username,
+        //                    checkOutTime = transaction.CheckoutDateTime,
+        //                    totalDuration = totalDuration?.ToString(@"hh\:mm\:ss"),
+        //                    checkInMethod = transaction.CheckInMethod,
+        //                    lastTransactionDate = user.LastTransactionDate,
+        //                    status = "Success"
+        //                });
+        //            }
+        //            catch (Exception ex)
+        //            {
+        //                results.Add(new
+        //                {
+        //                    message = $"Error processing request: {ex.Message}",
+        //                    status = "Error"
+        //                });
+        //            }
+        //        }
+
+        //        return Ok(results);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return StatusCode(500, $"Internal server error: {ex.Message}");
+        //    }
+        //}
+
+
 
         [HttpPost("checkout")]
         public async Task<IActionResult> CheckOut([FromBody] AttendanceRequest request)
@@ -183,7 +401,7 @@ namespace ucsApplication.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
-
+        
 
         public class AttendanceRequest
         {
@@ -219,6 +437,31 @@ namespace ucsApplication.Controllers
 
                 // Step 3: Return the list of active check-ins
                 return Ok(activeCheckIns);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+
+        [HttpGet("master")]
+        public async Task<IActionResult> GetMasterData()
+        {
+            try
+            {
+                var masterData = await _context.MasterTable.OrderByDescending(m=> m.LastTransactionDate)
+                    .Select(m => new
+                    {
+                        m.MasterId,
+                        m.UserId,
+                        m.Username,
+                        m.FingerPrintData,
+                        m.LastTransactionDate
+                    })
+                    .ToListAsync();
+
+                return Ok(masterData);
             }
             catch (Exception ex)
             {
