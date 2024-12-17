@@ -31,7 +31,7 @@ namespace ucsApplication.Controllers
                 // Step 1: Find the user in MasterTable
                 MasterTable user = null;
 
-                if (!string.IsNullOrEmpty(request.FingerPrintData))
+                if (string.IsNullOrEmpty(request.FingerPrintData))
                 {
                     // If FingerPrintData is provided, search using it
                     user = await _context.MasterTable
@@ -127,7 +127,7 @@ namespace ucsApplication.Controllers
                 // Step 1: Find the user in MasterTable
                 MasterTable user = null;
 
-                if (!string.IsNullOrEmpty(request.FingerPrintData))
+                if (string.IsNullOrEmpty(request.FingerPrintData))
                 {
                     user = await _context.MasterTable
                         .FirstOrDefaultAsync(u => u.FingerPrintData == request.FingerPrintData);
