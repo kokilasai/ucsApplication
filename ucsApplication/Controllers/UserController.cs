@@ -17,17 +17,23 @@ namespace ucsApplication.Controllers
             _context = context;
         }
 
-       
-        public class AttendanceRequest
+
+        public class CheckInRequest
         {
-            public int? UserId { get; set; }
+            public int UserId { get; set; }
             public DateTime? Checkin { get; set; }
+            public string FingerPrintData { get; set; }
+        }
+
+        public class CheckOutRequest
+        {
+            public int UserId { get; set; }
             public DateTime? Checkout { get; set; }
             public string FingerPrintData { get; set; }
         }
 
         [HttpPost("checkin")]
-        public async Task<IActionResult> CheckIn([FromBody] List<AttendanceRequest> requests)
+        public async Task<IActionResult> CheckIn([FromBody] List<CheckInRequest> requests)
         {
             try
             {
@@ -142,7 +148,7 @@ namespace ucsApplication.Controllers
         }
 
         [HttpPost("checkout")]
-        public async Task<IActionResult> CheckOut([FromBody] List<AttendanceRequest> requests)
+        public async Task<IActionResult> CheckOut([FromBody] List<CheckOutRequest> requests)
         {
             try
             {
@@ -251,7 +257,6 @@ namespace ucsApplication.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
-
 
 
         [HttpGet("active-checkins")]
