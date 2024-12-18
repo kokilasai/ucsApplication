@@ -243,7 +243,8 @@ namespace ucsApplication.Controllers
                         checkOutTime = transaction.CheckoutDateTime,
                         totalDuration = totalDuration?.ToString(@"hh\:mm\:ss"),
                         checkInMethod = transaction.CheckInMethod,
-                        lastTransactionDate = user.LastTransactionDate
+                        lastTransactionDate = user.LastTransactionDate,
+                        status = "Success"
                     });
                 }
 
